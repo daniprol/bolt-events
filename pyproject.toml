@@ -1,0 +1,35 @@
+[project]
+name = "a2a-bolt-router"
+version = "0.1.0"
+description = "A2A Protocol Router with Django-Bolt"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "django>=6.0.2",
+    "django-bolt>=0.6.0",
+    "django-q2>=1.9.0",
+    "djangorestframework>=3.16.1",
+    "djangorestframework-simplejwt>=5.5.1",
+    "msgspec>=0.20.0",
+    "redis>=7.1.1",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM", "RUF"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+DJANGO_SETTINGS_MODULE = "a2a_project.settings"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-asyncio>=1.3.0",
+    "pytest-django>=4.12.0",
+    "ruff>=0.15.1",
+]

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}A2A Playground - {{ agent.name|default:"Agent" }}{% endblock %}
+
+{% block content %}
+<div class="flex h-full">
+    <!-- Sidebar -->
+    {% include "playground/_sidebar.html" %}
+    
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-full bg-white dark:bg-dark-900">
+        <!-- Messages -->
+        {% include "playground/_messages.html" %}
+        
+        <!-- Input -->
+        {% include "playground/_input.html" %}
+    </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/playground.js' %}"></script>
+{% endblock %}

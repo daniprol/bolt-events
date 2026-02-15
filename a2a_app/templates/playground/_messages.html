@@ -1,0 +1,135 @@
+{% load static %}
+<!-- Chat Messages Partial -->
+<div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
+    <!-- Welcome Screen (when no conversation selected) -->
+    <div id="welcome-screen" class="flex flex-col items-center justify-center h-full min-h-[50vh]">
+        <div class="text-center max-w-lg">
+            <div class="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+            </div>
+            <h1 class="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
+                {{ agent.name|default:"A2A Agent" }}
+            </h1>
+            <p class="text-gray-500 dark:text-gray-400 mb-6">
+                {{ agent.description|default:"Start a conversation to interact with the agent." }}
+            </p>
+            
+            <!-- Capabilities -->
+            {% if agent.capabilities %}
+            <div class="flex flex-wrap justify-center gap-2 mb-6">
+                {% if agent.capabilities.streaming %}
+                <span class="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs rounded-full">
+                    Streaming
+                </span>
+                {% endif %}
+                {% if agent.capabilities.pushNotifications %}
+                <span class="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded-full">
+                    Push Notifications
+                </span>
+                {% endif %}
+                {% if agent.capabilities.stateTransitionNotifications %}
+                <span class="px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs rounded-full">
+                    State Notifications
+                </span>
+                {% endif %}
+            </div>
+            {% endif %}
+            
+            <p class="text-sm text-gray-400 dark:text-gray-500">
+                Select a conversation from the sidebar or start a new one.
+            </p>
+        </div>
+    </div>
+    
+    <!-- Messages will be rendered here -->
+    <div id="messages-container" class="hidden space-y-4"></div>
+</div>
+
+<!-- Message Templates (hidden) -->
+<template id="user-message-template">
+    <div class="flex justify-end">
+        <div class="max-w-[80%] rounded-2xl px-4 py-3 bg-gray-200 dark:bg-dark-700">
+            <div class="text-sm whitespace-pre-wrap message-content"></div>
+        </div>
+    </div>
+</template>
+
+<template id="agent-message-template">
+    <div class="flex gap-3">
+        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex-shrink-0 flex items-center justify-center text-white text-sm font-medium agent-avatar">
+            A
+        </div>
+        <div class="max-w-[80%]">
+            <!-- Thinking Block -->
+            <div class="thinking-block hidden mb-2">
+                <button class="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-dark-800 rounded-lg text-xs text-gray-500 dark:text-gray-400">
+                    <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Thinking...</span>
+                </button>
+            </div>
+            
+            <!-- Message Content -->
+            <div class="rounded-2xl px-4 py-3 bg-gray-100 dark:bg-dark-800">
+                <div class="text-sm whitespace-pre-wrap message-content"></div>
+            </div>
+            
+            <!-- Tool Calls -->
+            <div class="tool-calls mt-2 space-y-2 hidden"></div>
+            
+            <!-- Artifacts -->
+            <div class="artifacts mt-2 space-y-2 hidden"></div>
+        </div>
+    </div>
+</template>
+
+<template id="tool-call-template">
+    <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+        <div class="flex items-center gap-2 text-xs font-medium text-yellow-800 dark:text-yellow-200 mb-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+            </svg>
+            <span class="tool-name"></span>
+        </div>
+        <pre class="text-xs text-yellow-700 dark:text-yellow-300 bg-yellow-100 dark:bg-yellow-900/40 rounded p-2 overflow-x-auto"></pre>
+    </div>
+</template>
+
+<template id="tool-result-template">
+    <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3 mt-2">
+        <div class="text-xs font-medium text-green-800 dark:text-green-200 mb-1">Result:</div>
+        <pre class="text-xs text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/40 rounded p-2 overflow-x-auto"></pre>
+    </div>
+</template>
+
+<template id="artifact-template">
+    <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+        <div class="flex items-center gap-2 text-xs font-medium text-blue-800 dark:text-blue-200 mb-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            <span class="artifact-name">Artifact</span>
+        </div>
+        <pre class="text-xs text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40 rounded p-2 overflow-x-auto artifact-content"></pre>
+    </div>
+</template>
+
+<template id="loading-template">
+    <div class="flex gap-3">
+        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex-shrink-0 flex items-center justify-center text-white text-sm font-medium">
+            A
+        </div>
+        <div class="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+            <div class="flex gap-1">
+                <span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0ms"></span>
+                <span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 150ms"></span>
+                <span class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 300ms"></span>
+            </div>
+            <span class="text-sm">Thinking...</span>
+        </div>
+    </div>
+</template>

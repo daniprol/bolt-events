@@ -1,0 +1,59 @@
+version: "3.8"
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python manage.py runbolt --dev
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=True
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_URL=redis://redis:6379/1
+      - A2A_STORAGE_BACKEND=django
+      - A2A_EXECUTOR_TYPE=sync
+    depends_on:
+      - redis
+    networks:
+      - a2a-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - a2a-network
+    volumes:
+      - redis-data:/data
+
+  qcluster:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python manage.py qcluster
+    volumes:
+      - .:/app
+    environment:
+      - DEBUG=True
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_URL=redis://redis:6379/1
+      - A2A_STORAGE_BACKEND=django
+      - A2A_EXECUTOR_TYPE=djangoq
+    depends_on:
+      - redis
+      - web
+    networks:
+      - a2a-network
+
+networks:
+  a2a-network:
+    driver: bridge
+
+volumes:
+  redis-data:
