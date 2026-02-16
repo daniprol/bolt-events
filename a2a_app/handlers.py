@@ -3,15 +3,49 @@
 import uuid
 from typing import Any
 
-from django.conf import settings
-
-from a2a_app.events import RedisEventPublisher, STREAM_PREFIX
+from a2a_app.events import RedisEventPublisher
 from a2a_app.executors import execute_fake_agent
 from a2a_app.redis_client import get_redis_client
 from a2a_app.schemas import TaskGetParams, TaskIdParams, TaskSendParams
 from a2a_app.services import TaskService
 
 TERMINAL_STATES = {"completed", "failed", "canceled", "rejected"}
+
+
+def _get_terminal_state(event_type: str) -> str | None:
+    """Convert task.* event type to terminal task state when applicable."""
+    if not event_type.startswith("task."):
+        return None
+    state = event_type.removeprefix("task.")
+    return state if state in TERMINAL_STATES else None
+
+
+async def _process_task_event(
+    *,
+    task_id: str,
+    publisher: RedisEventPublisher,
+    event: dict[str, Any],
+) -> None:
+    """Persist and publish a single task event."""
+    event_type = event.get("type", "")
+    event["taskId"] = task_id
+    await publisher.publish(task_id, event)
+
+    if event_type == "task.message":
+        msg = event.get("message")
+        if msg:
+            await TaskService.append_message(task_id, msg)
+        return
+
+    if event_type == "task.artifact":
+        artifact = event.get("artifact")
+        if artifact:
+            await TaskService.add_artifact(task_id, artifact)
+        return
+
+    terminal_state = _get_terminal_state(event_type)
+    if terminal_state:
+        await TaskService.update_status(task_id, terminal_state, event.get("message"))
 
 
 async def handle_tasks_send(params: dict) -> dict:
@@ -31,25 +65,8 @@ async def handle_tasks_send(params: dict) -> dict:
         "parts": [{"type": p.type, "text": p.text} for p in validated.message.parts],
     }
 
-    async def on_event(event: dict):
-        event_type = event.get("type", "")
-        event["taskId"] = task_id
-        await publisher.publish(task_id, event)
-
-        if event_type == "task.message":
-            msg = event.get("message", {})
-            if msg:
-                await TaskService.append_message(task_id, msg)
-        elif event_type == "task.artifact":
-            artifact = event.get("artifact")
-            if artifact:
-                await TaskService.add_artifact(task_id, artifact)
-        elif event_type in TERMINAL_STATES:
-            state = (
-                "completed" if event_type == "task.completed" else event_type.replace("task.", "")
-            )
-            msg = event.get("message")
-            await TaskService.update_status(task_id, state, msg)
+    async def on_event(event: dict[str, Any]) -> None:
+        await _process_task_event(task_id=task_id, publisher=publisher, event=event)
 
     await execute_fake_agent(message_data, on_event)
 

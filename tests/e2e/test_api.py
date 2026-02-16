@@ -1,6 +1,15 @@
 """E2E tests for API endpoints."""
 
 import pytest
+from httpx import AsyncClient, ASGITransport
+
+
+@pytest.fixture
+async def client(live_server):
+    """Async HTTP client for testing Django-Bolt endpoints."""
+    transport = ASGITransport(app=live_server)
+    async with AsyncClient(transport=transport, base_url=live_server.url) as client:
+        yield client
 
 
 @pytest.mark.django_db
@@ -9,15 +18,29 @@ class TestConversationAPI:
 
     async def test_list_conversations_empty(self, client):
         """Test listing conversations when none exist."""
-        response = await client.get("/agent/conversations/")
+        response = await client.get("/conversations")
         assert response.status_code == 200
         data = response.json()
         assert "conversations" in data
+        assert isinstance(data["conversations"], list)
+
+    async def test_list_conversations_returns_correct_format(self, client):
+        """Test list conversations returns {conversations: [...]} format."""
+        await client.post("/conversations", json={})
+
+        response = await client.get("/conversations")
+        data = response.json()
+
+        assert "conversations" in data
+        assert isinstance(data["conversations"], list)
+        assert len(data["conversations"]) == 1
+        assert "context_id" in data["conversations"][0]
+        assert "title" in data["conversations"][0]
 
     async def test_create_conversation(self, client):
         """Test creating a new conversation."""
         response = await client.post(
-            "/agent/conversations/",
+            "/conversations",
             json={"agent_id": "test-agent"},
         )
         assert response.status_code == 201
@@ -27,7 +50,7 @@ class TestConversationAPI:
     async def test_create_conversation_with_id(self, client):
         """Test creating a conversation with custom ID."""
         response = await client.post(
-            "/agent/conversations/",
+            "/conversations",
             json={"context_id": "my-custom-id"},
         )
         assert response.status_code == 201
@@ -35,28 +58,28 @@ class TestConversationAPI:
 
     async def test_get_conversation(self, client):
         """Test getting a conversation by ID."""
-        create_resp = await client.post("/agent/conversations/", json={})
+        create_resp = await client.post("/conversations", json={})
         ctx_id = create_resp.json()["context_id"]
 
-        response = await client.get(f"/agent/conversations/{ctx_id}/")
+        response = await client.get(f"/conversations/{ctx_id}")
         assert response.status_code == 200
         data = response.json()
         assert data["context_id"] == ctx_id
 
     async def test_get_nonexistent_conversation(self, client):
         """Test getting a non-existent conversation."""
-        response = await client.get("/agent/conversations/nonexistent/")
+        response = await client.get("/conversations/nonexistent")
         assert response.status_code == 404
 
     async def test_delete_conversation(self, client):
         """Test deleting a conversation."""
-        create_resp = await client.post("/agent/conversations/", json={})
+        create_resp = await client.post("/conversations", json={})
         ctx_id = create_resp.json()["context_id"]
 
-        response = await client.delete(f"/agent/conversations/{ctx_id}/")
+        response = await client.delete(f"/conversations/{ctx_id}")
         assert response.status_code == 200
 
-        get_resp = await client.get(f"/agent/conversations/{ctx_id}/")
+        get_resp = await client.get(f"/conversations/{ctx_id}")
         assert get_resp.status_code == 404
 
 
@@ -67,7 +90,7 @@ class TestJSONRPCAPI:
     async def test_tasks_send(self, client):
         """Test tasks/send method."""
         response = await client.post(
-            "/agent/rpc/",
+            "/rpc",
             json={
                 "jsonrpc": "2.0",
                 "method": "tasks/send",
@@ -88,7 +111,7 @@ class TestJSONRPCAPI:
     async def test_tasks_send_with_id(self, client):
         """Test tasks/send with custom task ID."""
         response = await client.post(
-            "/agent/rpc/",
+            "/rpc",
             json={
                 "jsonrpc": "2.0",
                 "method": "tasks/send",
@@ -104,7 +127,7 @@ class TestJSONRPCAPI:
     async def test_tasks_get(self, client):
         """Test tasks/get method."""
         send_resp = await client.post(
-            "/agent/rpc/",
+            "/rpc",
             json={
                 "jsonrpc": "2.0",
                 "method": "tasks/send",
@@ -117,7 +140,7 @@ class TestJSONRPCAPI:
         task_id = send_resp.json()["result"]["id"]
 
         response = await client.post(
-            "/agent/rpc/",
+            "/rpc",
             json={
                 "jsonrpc": "2.0",
                 "method": "tasks/get",
@@ -131,7 +154,7 @@ class TestJSONRPCAPI:
     async def test_tasks_get_nonexistent(self, client):
         """Test getting a non-existent task."""
         response = await client.post(
-            "/agent/rpc/",
+            "/rpc",
             json={
                 "jsonrpc": "2.0",
                 "method": "tasks/get",
@@ -145,7 +168,7 @@ class TestJSONRPCAPI:
     async def test_method_not_found(self, client):
         """Test calling a non-existent method."""
         response = await client.post(
-            "/agent/rpc/",
+            "/rpc",
             json={
                 "jsonrpc": "2.0",
                 "method": "tasks/invalid",
@@ -159,7 +182,7 @@ class TestJSONRPCAPI:
     async def test_tasks_send_subscribe(self, client):
         """Test tasks/sendSubscribe method."""
         response = await client.post(
-            "/agent/rpc/",
+            "/rpc",
             json={
                 "jsonrpc": "2.0",
                 "method": "tasks/sendSubscribe",
@@ -169,12 +192,12 @@ class TestJSONRPCAPI:
         )
         data = response.json()
         assert "streamUrl" in data["result"]
-        assert data["result"]["streamUrl"].endswith("/stream/")
+        assert data["result"]["streamUrl"].endswith("/stream")
 
     async def test_tasks_cancel(self, client):
         """Test tasks/cancel method."""
         send_resp = await client.post(
-            "/agent/rpc/",
+            "/rpc",
             json={
                 "jsonrpc": "2.0",
                 "method": "tasks/send",
@@ -187,7 +210,7 @@ class TestJSONRPCAPI:
         task_id = send_resp.json()["result"]["id"]
 
         response = await client.post(
-            "/agent/rpc/",
+            "/rpc",
             json={
                 "jsonrpc": "2.0",
                 "method": "tasks/cancel",
@@ -200,7 +223,7 @@ class TestJSONRPCAPI:
     async def test_tasks_resubscribe(self, client):
         """Test tasks/resubscribe method."""
         send_resp = await client.post(
-            "/agent/rpc/",
+            "/rpc",
             json={
                 "jsonrpc": "2.0",
                 "method": "tasks/send",
@@ -213,7 +236,7 @@ class TestJSONRPCAPI:
         task_id = send_resp.json()["result"]["id"]
 
         response = await client.post(
-            "/agent/rpc/",
+            "/rpc",
             json={
                 "jsonrpc": "2.0",
                 "method": "tasks/resubscribe",
@@ -231,7 +254,7 @@ class TestAgentCard:
 
     async def test_get_agent_card(self, client):
         """Test getting the agent card."""
-        response = await client.get("/agent/card/")
+        response = await client.get("/card")
         assert response.status_code == 200
         data = response.json()
         assert "name" in data
@@ -239,7 +262,7 @@ class TestAgentCard:
 
     async def test_get_agent_card_well_known(self, client):
         """Test getting the agent card from well-known location."""
-        response = await client.get("/agent/.well-known/agent-card.json")
+        response = await client.get("/.well-known/agent-card.json")
         assert response.status_code == 200
         data = response.json()
         assert "name" in data

@@ -27,14 +27,14 @@ class TestPlaygroundUI:
 
     async def test_playground_loads(self, browser_page, live_server):
         """Test that playground page loads."""
-        await browser_page.goto(live_server.url + "/")
+        await browser_page.goto(live_server.url)
 
         title = await browser_page.title()
         assert "A2A" in title or "Playground" in title
 
     async def test_sidebar_present(self, browser_page, live_server):
         """Test sidebar elements are present."""
-        await browser_page.goto(live_server.url + "/")
+        await browser_page.goto(live_server.url)
 
         new_chat = browser_page.locator("#new-chat-btn")
         if await new_chat.count() > 0:
@@ -42,7 +42,7 @@ class TestPlaygroundUI:
 
     async def test_chat_input_present(self, browser_page, live_server):
         """Test chat input is visible."""
-        await browser_page.goto(live_server.url + "/")
+        await browser_page.goto(live_server.url)
 
         chat_input = browser_page.locator("#chat-input")
         if await chat_input.count() > 0:
@@ -50,13 +50,13 @@ class TestPlaygroundUI:
 
     async def test_agent_card_displayed(self, browser_page, live_server):
         """Test agent info is displayed."""
-        await browser_page.goto(live_server.url + "/")
+        await browser_page.goto(live_server.url)
 
         await browser_page.wait_for_load_state("networkidle")
 
     async def test_dark_mode_toggle(self, browser_page, live_server):
         """Test dark mode toggle works."""
-        await browser_page.goto(live_server.url + "/")
+        await browser_page.goto(live_server.url)
 
         theme_toggle = browser_page.locator("#theme-toggle")
         if await theme_toggle.count() > 0:
@@ -70,7 +70,7 @@ class TestPlaygroundUI:
 
     async def test_create_new_conversation(self, browser_page, live_server):
         """Test creating new conversation."""
-        await browser_page.goto(live_server.url + "/")
+        await browser_page.goto(live_server.url)
 
         new_chat = browser_page.locator("#new-chat-btn")
         if await new_chat.count() > 0:
@@ -88,7 +88,7 @@ class TestPlaygroundInteraction:
 
     async def test_send_message(self, browser_page, live_server):
         """Test sending a message."""
-        await browser_page.goto(live_server.url + "/")
+        await browser_page.goto(live_server.url)
 
         new_chat = browser_page.locator("#new-chat-btn")
         if await new_chat.count() > 0:
@@ -111,7 +111,7 @@ class TestPlaygroundInteraction:
 
     async def test_enter_sends_message(self, browser_page, live_server):
         """Test pressing Enter sends message."""
-        await browser_page.goto(live_server.url + "/")
+        await browser_page.goto(live_server.url)
 
         new_chat = browser_page.locator("#new-chat-btn")
         if await new_chat.count() > 0:
@@ -126,7 +126,7 @@ class TestPlaygroundInteraction:
 
     async def test_empty_message_not_sent(self, browser_page, live_server):
         """Test empty message is not sent."""
-        await browser_page.goto(live_server.url + "/")
+        await browser_page.goto(live_server.url)
 
         chat_input = browser_page.locator("#chat-input")
         if await chat_input.count() > 0:
@@ -146,17 +146,17 @@ class TestPlaygroundResponsive:
     async def test_mobile_view(self, browser_page, live_server):
         """Test playground works on mobile view."""
         await browser_page.set_viewport_size({"width": 375, "height": 667})
-        await browser_page.goto(live_server.url + "/")
+        await browser_page.goto(live_server.url)
         await browser_page.wait_for_load_state("networkidle")
 
     async def test_tablet_view(self, browser_page, live_server):
         """Test playground works on tablet view."""
         await browser_page.set_viewport_size({"width": 768, "height": 1024})
-        await browser_page.goto(live_server.url + "/")
+        await browser_page.goto(live_server.url)
         await browser_page.wait_for_load_state("networkidle")
 
     async def test_desktop_view(self, browser_page, live_server):
         """Test playground works on desktop view."""
         await browser_page.set_viewport_size({"width": 1280, "height": 800})
-        await browser_page.goto(live_server.url + "/")
+        await browser_page.goto(live_server.url)
         await browser_page.wait_for_load_state("networkidle")

@@ -1,5 +1,6 @@
 import json
 
+
 def format_sse_event(data: dict, event_id: str | None = None) -> str:
     """Format data as SSE event."""
     lines = []

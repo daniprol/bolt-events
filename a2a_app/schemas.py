@@ -1,10 +1,8 @@
 """A2A Schemas - msgspec Serializers for domain and API."""
 
-from django_bolt.serializers import Serializer, field
-from typing import Annotated
-from msgspec import Meta
 from datetime import datetime
 
+from django_bolt.serializers import Serializer, field
 
 # ============================================
 # Domain Models (used for API responses)

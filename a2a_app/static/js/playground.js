@@ -15,6 +15,7 @@
         isStreaming: false,
         currentEventSource: null,
         lastEventId: null,
+        hasMessages: false,
     };
 
     // ============================================
@@ -32,17 +33,22 @@
     };
 
     // ============================================
+    // Configuration
+    // ============================================
+    const API_PREFIX = '';
+
+    // ============================================
     // API Functions
     // ============================================
     const API = {
         async getConversations() {
-            const response = await fetch('/agent/conversations/');
+            const response = await fetch(`${API_PREFIX}/conversations`);
             const data = await response.json();
             return data.conversations || [];
         },
 
         async createConversation() {
-            const response = await fetch('/agent/conversations/', {
+            const response = await fetch(`${API_PREFIX}/conversations`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({}),
@@ -52,19 +58,19 @@
         },
 
         async getConversation(contextId) {
-            const response = await fetch(`/agent/conversations/${contextId}/`);
+            const response = await fetch(`${API_PREFIX}/conversations/${contextId}`);
             if (!response.ok) return null;
             return await response.json();
         },
 
         async deleteConversation(contextId) {
-            await fetch(`/agent/conversations/${contextId}/`, {
+            await fetch(`${API_PREFIX}/conversations/${contextId}`, {
                 method: 'DELETE',
             });
         },
 
         async sendMessage(contextId, message) {
-            const response = await fetch('/agent/rpc/', {
+            const response = await fetch(`${API_PREFIX}/rpc`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -85,7 +91,7 @@
         },
 
         async getTask(taskId) {
-            const response = await fetch('/agent/rpc/', {
+            const response = await fetch(`${API_PREFIX}/rpc`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -101,7 +107,7 @@
 
         async getAgentCard() {
             try {
-                const response = await fetch('/agent/card/');
+                const response = await fetch(`${API_PREFIX}/card`);
                 return await response.json();
             } catch (e) {
                 return {
@@ -119,7 +125,7 @@
     function connectToStream(taskId, onMessage, onComplete) {
         disconnectFromStream();
 
-        const url = `/agent/rpc/${taskId}/stream/`;
+        const url = `${API_PREFIX}/rpc/${taskId}/stream`;
         const eventSource = new EventSource(url);
         state.currentEventSource = eventSource;
 
@@ -180,8 +186,8 @@
         }
 
         elements.conversationList.innerHTML = filtered.map(conv => `
-            <button 
-                class="conversation-item w-full text-left p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-dark-700 transition-colors ${state.currentConversationId === conv.context_id ? 'bg-gray-200 dark:bg-dark-700' : ''}"
+            <div 
+                class="conversation-item group w-full text-left p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-dark-700 transition-colors cursor-pointer ${state.currentConversationId === conv.context_id ? 'bg-gray-200 dark:bg-dark-700' : ''}"
                 data-context-id="${conv.context_id}"
             >
                 <div class="flex items-center gap-2">
@@ -202,7 +208,7 @@
                         </svg>
                     </button>
                 </div>
-            </button>
+            </div>
         `).join('');
 
         // Add click handlers
@@ -225,6 +231,7 @@
     function showWelcomeScreen() {
         if (elements.welcomeScreen) elements.welcomeScreen.classList.remove('hidden');
         if (elements.messagesContainer) elements.messagesContainer.classList.add('hidden');
+        state.hasMessages = false;
     }
 
     function showMessagesContainer() {
@@ -389,6 +396,7 @@
         
         // Render existing messages
         const messages = conv.messages || [];
+        state.hasMessages = messages.length > 0;
         renderMessages(messages);
         
         // If streaming, connect to stream
@@ -402,7 +410,13 @@
     }
 
     async function createNewConversation() {
+        if (state.currentConversationId && !state.hasMessages) {
+            return;
+        }
+        
         disconnectFromStream();
+        state.currentConversationId = null;
+        state.hasMessages = false;
         
         const conv = await API.createConversation();
         await loadConversations();
@@ -416,6 +430,7 @@
         
         if (state.currentConversationId === contextId) {
             state.currentConversationId = null;
+            state.hasMessages = false;
             showWelcomeScreen();
         }
         
@@ -424,6 +439,8 @@
 
     async function sendMessage(message) {
         if (!state.currentConversationId || !message.trim()) return;
+        
+        state.hasMessages = true;
         
         // Add user message to UI
         appendMessage('user', [{ type: 'text', text: message }]);

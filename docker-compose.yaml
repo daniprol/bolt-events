@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: python manage.py runbolt --dev
+    command: uv run python manage.py runbolt --dev
     volumes:
       - .:/app
     ports:
@@ -35,7 +35,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: python manage.py qcluster
+    command: uv run python manage.py qcluster
     volumes:
       - .:/app
     environment:

@@ -1,19 +1,18 @@
 """A2A Services - Business logic layer."""
 
-import uuid
 import logging
+import uuid
 
 from a2a_app.models import A2ATask, Conversation
 from a2a_app.schemas import (
-    Task,
     Conversation as ConversationSchema,
+)
+from a2a_app.schemas import (
     ConversationDetail,
     Message,
-    TaskStatus,
-    TaskSendResponse,
-    TaskSubscribeResponse,
-    task_from_orm,
+    Task,
     conversation_from_orm,
+    task_from_orm,
 )
 
 logger = logging.getLogger(__name__)

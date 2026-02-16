@@ -110,7 +110,7 @@ Q_CLUSTER = {
     "name": "a2a_router",
     "workers": 4,
     "timeout": 60,
-    "retry": 10,
+    "retry": 120,
     "queue_limit": 500,
     "compression": True,
     "django_redis": "default",

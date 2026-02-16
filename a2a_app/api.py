@@ -2,7 +2,6 @@
 
 import json
 import logging
-import uuid
 
 from django.conf import settings
 from django_bolt import BoltAPI, Request
@@ -10,7 +9,7 @@ from django_bolt.middleware import no_compress
 from django_bolt.responses import JSON, StreamingResponse
 from django_bolt.shortcuts import render
 
-from a2a_app.events import RedisEventPublisher, RedisEventSubscriber, STREAM_PREFIX
+from a2a_app.events import RedisEventSubscriber
 from a2a_app.handlers import (
     handle_tasks_cancel,
     handle_tasks_get,
@@ -54,13 +53,13 @@ def format_sse_event(data: dict, event_id: str | None = None) -> str:
 # ============================================
 
 
-@api.get("/")
+@api.get("")
 async def playground_home(request: Request):
     """Render the A2A Playground."""
     return render(request, "playground/index.html", {"agent": get_agent_card()})
 
 
-@api.get("/playground/")
+@api.get("/playground")
 async def playground(request: Request):
     """Render the A2A Playground."""
     return render(request, "playground/index.html", {"agent": get_agent_card()})
@@ -71,7 +70,7 @@ async def playground(request: Request):
 # ============================================
 
 
-@api.get("/card/")
+@api.get("/card")
 async def get_card(request: Request):
     """Return the agent card."""
     return get_agent_card()
@@ -88,19 +87,19 @@ async def get_agent_card_well_known(request: Request):
 # ============================================
 
 
-@api.get("/conversations/")
+@api.get("/conversations")
 async def list_conversations(request: Request):
     """List all conversations."""
-    return await ConversationService.list()
+    return {"conversations": await ConversationService.list()}
 
 
-@api.post("/conversations/")
+@api.post("/conversations")
 async def create_conversation(request: Request, body: CreateConversationBody):
     """Create a new conversation."""
     return await ConversationService.create(body.context_id, body.agent_id)
 
 
-@api.delete("/conversations/{context_id}/")
+@api.delete("/conversations/{context_id}")
 async def delete_conversation(request: Request, context_id: str):
     """Delete a conversation and its tasks."""
     deleted = await ConversationService.delete(context_id)
@@ -109,7 +108,7 @@ async def delete_conversation(request: Request, context_id: str):
     return {"success": True}
 
 
-@api.get("/conversations/{context_id}/")
+@api.get("/conversations/{context_id}")
 async def get_conversation(request: Request, context_id: str):
     """Get a conversation by ID with history and stream indicator."""
     result = await ConversationService.get_detail(context_id)
@@ -123,7 +122,7 @@ async def get_conversation(request: Request, context_id: str):
 # ============================================
 
 
-@api.post("/rpc/")
+@api.post("/rpc")
 async def handle_rpc(request: Request, payload: JSONRPCRequest) -> JSONRPCResponse:
     """Handle A2A JSON-RPC requests."""
     method = payload.method
@@ -177,7 +176,7 @@ async def handle_rpc(request: Request, payload: JSONRPCRequest) -> JSONRPCRespon
 # ============================================
 
 
-@api.get("/rpc/{task_id}/stream/")
+@api.get("/rpc/{task_id}/stream")
 @no_compress
 async def stream_task(request: Request, task_id: str):
     """Stream events for a task using SSE."""

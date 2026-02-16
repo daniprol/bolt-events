@@ -6,14 +6,16 @@ for testing the streaming and SSE functionality.
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 logger = logging.getLogger(__name__)
+Event = dict[str, Any]
+EventCallback = Callable[[Event], Awaitable[None]]
 
 
 class FakeAgentExecutor:
-    """A fake A2A agent that yields simulated events.
+    """A fake A2A agent that emits simulated events.
 
     This agent generates various types of events for testing and benchmarking:
     - Text responses (chunked)
@@ -45,53 +47,50 @@ class FakeAgentExecutor:
     async def execute(
         self,
         message: dict[str, Any],
-        on_event: Any | None = None,
-    ) -> AsyncIterator[dict[str, Any]]:
-        """Execute the fake agent and yield events.
+        on_event: EventCallback | None = None,
+    ) -> None:
+        """Execute the fake agent and emit events through callback.
 
         Args:
             message: The input message from the A2A protocol.
-            on_event: Optional callback for emitting events.
-
-        Yields:
-            Event dictionaries representing different stages of processing.
+            on_event: Optional callback for handling emitted events.
         """
         task_id = message.get("taskId", "unknown")
         user_message = self._extract_text(message)
 
         logger.info(f"FakeAgentExecutor processing task {task_id}: {user_message}")
 
-        if on_event:
-            await on_event(
-                {
-                    "type": "task.working",
-                    "taskId": task_id,
-                }
-            )
+        await self._emit(
+            on_event,
+            {
+                "type": "task.working",
+                "taskId": task_id,
+            },
+        )
 
         if self._include_tools:
-            if on_event:
-                await on_event(
-                    {
-                        "type": "tool-call",
-                        "taskId": task_id,
-                        "toolCallId": f"tool-{task_id}-1",
-                        "toolName": "fake_search",
-                        "input": {"query": user_message},
-                    }
-                )
+            await self._emit(
+                on_event,
+                {
+                    "type": "tool-call",
+                    "taskId": task_id,
+                    "toolCallId": f"tool-{task_id}-1",
+                    "toolName": "fake_search",
+                    "input": {"query": user_message},
+                },
+            )
 
             await asyncio.sleep(self._text_delay)
 
-            if on_event:
-                await on_event(
-                    {
-                        "type": "tool-call-result",
-                        "taskId": task_id,
-                        "toolCallId": f"tool-{task_id}-1",
-                        "result": {"results": ["fake result 1", "fake result 2"]},
-                    }
-                )
+            await self._emit(
+                on_event,
+                {
+                    "type": "tool-call-result",
+                    "taskId": task_id,
+                    "toolCallId": f"tool-{task_id}-1",
+                    "result": {"results": ["fake result 1", "fake result 2"]},
+                },
+            )
 
         for i in range(self._num_chunks):
             text = f"Response chunk {i + 1}/ {self._num_chunks}. "
@@ -99,58 +98,63 @@ class FakeAgentExecutor:
             text += "This is a simulated response for testing purposes. "
             text += f"Processing step {i + 1} of {self._num_chunks} complete."
 
-            if on_event:
-                await on_event(
-                    {
-                        "type": "task.message",
-                        "taskId": task_id,
-                        "message": {
-                            "role": "agent",
-                            "parts": [{"type": "text", "text": text}],
-                        },
-                    }
-                )
+            await self._emit(
+                on_event,
+                {
+                    "type": "task.message",
+                    "taskId": task_id,
+                    "message": {
+                        "role": "agent",
+                        "parts": [{"type": "text", "text": text}],
+                    },
+                },
+            )
 
             await asyncio.sleep(self._text_delay)
 
         if self._include_artifacts:
-            if on_event:
-                await on_event(
-                    {
-                        "type": "task.artifact",
-                        "taskId": task_id,
-                        "artifact": {
-                            "name": "analysis_result",
-                            "parts": [
-                                {
-                                    "type": "data",
-                                    "data": {
-                                        "summary": "This is a simulated artifact for testing",
-                                        "items": ["item1", "item2", "item3"],
-                                        "metadata": {
-                                            "generated_at": "2024-01-01T00:00:00Z",
-                                            "version": "1.0",
-                                        },
-                                    },
-                                }
-                            ],
-                        },
-                    }
-                )
-
-        if on_event:
-            await on_event(
+            await self._emit(
+                on_event,
                 {
-                    "type": "task.completed",
+                    "type": "task.artifact",
                     "taskId": task_id,
-                    "message": {
-                        "role": "agent",
-                        "parts": [{"type": "text", "text": "Task completed successfully!"}],
+                    "artifact": {
+                        "name": "analysis_result",
+                        "parts": [
+                            {
+                                "type": "data",
+                                "data": {
+                                    "summary": "This is a simulated artifact for testing",
+                                    "items": ["item1", "item2", "item3"],
+                                    "metadata": {
+                                        "generated_at": "2024-01-01T00:00:00Z",
+                                        "version": "1.0",
+                                    },
+                                },
+                            }
+                        ],
                     },
-                }
+                },
             )
 
+        await self._emit(
+            on_event,
+            {
+                "type": "task.completed",
+                "taskId": task_id,
+                "message": {
+                    "role": "agent",
+                    "parts": [{"type": "text", "text": "Task completed successfully!"}],
+                },
+            },
+        )
+
         logger.info(f"FakeAgentExecutor completed task {task_id}")
+
+    async def _emit(self, callback: EventCallback | None, event: Event) -> None:
+        """Emit a single event if a callback is configured."""
+        if callback is not None:
+            await callback(event)
 
     def _extract_text(self, message: dict[str, Any]) -> str:
         """Extract text from the message."""
@@ -163,20 +167,16 @@ class FakeAgentExecutor:
 
 async def execute_fake_agent(
     message: dict[str, Any],
-    on_event: Any | None = None,
-) -> AsyncIterator[dict[str, Any]]:
-    """Execute a fake agent and yield events.
+    on_event: EventCallback | None = None,
+) -> None:
+    """Execute a fake agent and emit events through callback.
 
     This is a convenience function that creates a FakeAgentExecutor
     and executes it.
 
     Args:
         message: The input message from the A2A protocol.
-        on_event: Optional callback for emitting events.
-
-    Yields:
-        Event dictionaries representing different stages of processing.
+        on_event: Optional callback for handling emitted events.
     """
     agent = FakeAgentExecutor()
-    async for event in agent.execute(message, on_event):
-        yield event
+    await agent.execute(message, on_event)
