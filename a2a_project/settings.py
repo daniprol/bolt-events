@@ -122,10 +122,17 @@ Q_CLUSTER = {
 }
 
 # Redis Configuration for SSE Events
-REDIS_URL = os.environ.get(
-    "REDIS_URL",
-    f"redis://{os.environ.get('REDIS_HOST', 'localhost')}:{os.environ.get('REDIS_PORT', '6379')}/1",
-)
+REDIS = {
+    "URL": os.environ.get(
+        "REDIS_URL",
+        f"redis://{os.environ.get('REDIS_HOST', 'localhost')}:{os.environ.get('REDIS_PORT', '6379')}/1",
+    ),
+    "MAX_CONNECTIONS": int(os.environ.get("REDIS_MAX_CONNECTIONS", "100")),
+    "SOCKET_CONNECT_TIMEOUT": int(os.environ.get("REDIS_CONNECT_TIMEOUT", "10")),
+    "SOCKET_TIMEOUT": int(os.environ.get("REDIS_TIMEOUT", "10")),
+    "RETRY_ON_TIMEOUT": os.environ.get("REDIS_RETRY_ON_TIMEOUT", "true").lower() == "true",
+    "HEALTH_CHECK_INTERVAL": int(os.environ.get("REDIS_HEALTH_CHECK_INTERVAL", "30")),
+}
 
 # A2A Configuration
 A2A_CONFIG = {
