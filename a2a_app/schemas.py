@@ -1,8 +1,13 @@
 """A2A Schemas - msgspec Serializers for domain and API."""
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from django_bolt.serializers import Serializer, field
+
+if TYPE_CHECKING:
+    from a2a_app.models import Conversation as ConversationModel
+    from a2a_app.models import Task as TaskModel
 
 # ============================================
 # Domain Models (used for API responses)
@@ -29,8 +34,8 @@ class Task(Serializer):
     id: str
     contextId: str | None = None
     status: TaskStatus
-    history: list[Message] = []
-    artifacts: list[dict] = []
+    history: list[Message] = field(default_factory=list)
+    artifacts: list[dict] = field(default_factory=list)
     metadata: dict = field(default_factory=dict)
     createdAt: datetime | None = None
     updatedAt: datetime | None = None
@@ -53,8 +58,8 @@ class ConversationDetail(Serializer):
     stream_url: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
-    tasks: list[Task] = []
-    messages: list[dict] = []
+    tasks: list[Task] = field(default_factory=list)
+    messages: list[dict] = field(default_factory=list)
 
 
 # ============================================
@@ -125,7 +130,7 @@ class CreateConversationBody(Serializer):
 # ============================================
 
 
-def task_from_orm(task) -> Task:
+def task_from_orm(task: "TaskModel") -> Task:
     """Convert A2ATask ORM model to Task schema."""
     return Task(
         id=task.task_id,
@@ -142,7 +147,7 @@ def task_from_orm(task) -> Task:
     )
 
 
-def conversation_from_orm(conv, task_count: int = 0, title: str = "") -> Conversation:
+def conversation_from_orm(conv: "ConversationModel", task_count: int = 0, title: str = "") -> Conversation:
     """Convert Conversation ORM model to Conversation schema."""
     return Conversation(
         context_id=conv.context_id,

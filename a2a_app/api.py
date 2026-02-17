@@ -4,11 +4,12 @@ import json
 import logging
 
 from django.conf import settings
-from django_bolt import BoltAPI, Request
+from django_bolt import BoltAPI, Request, CompressionConfig
 from django_bolt.middleware import no_compress
 from django_bolt.responses import JSON, StreamingResponse
 from django_bolt.shortcuts import render
-
+from django_bolt.exceptions import NotFound
+from django_bolt.logging import LoggingConfig, create_logging_middleware
 from a2a_app.events import RedisEventSubscriber
 from a2a_app.handlers import (
     handle_tasks_cancel,
@@ -28,7 +29,45 @@ from a2a_app.services import ConversationService, TaskService
 
 logger = logging.getLogger(__name__)
 
-api = BoltAPI()
+api = BoltAPI(
+    compression=CompressionConfig(
+        backend="brotli",      # "brotli", "gzip", or "zstd"
+        minimum_size=1000,     # Minimum size to compress (bytes)
+        gzip_fallback=True,    # Fall back to gzip
+    )
+)
+
+# Production logging config
+config = LoggingConfig(
+    logger_name="a2a_app",
+
+    # Performance: Don't log every request
+    # sample_rate=0.1,          # Log 10% of successful requests
+    # min_duration_ms=100,      # Only log requests > 100ms
+
+    # Skip noisy paths
+    skip_paths={"/health", "/ready", "/metrics", "/favicon.ico"},
+    skip_status_codes={204, 304},
+
+    # Request logging
+    request_log_fields={"method", "path", "client_ip", "user_agent"},
+
+    # Response logging
+    response_log_fields={"status_code", "duration"},
+
+    # Security
+    obfuscate_headers={"authorization", "cookie", "x-api-key"},
+    obfuscate_cookies={"sessionid", "csrftoken", "jwt"},
+
+    # Body logging (careful in production)
+    log_request_body=False,
+)
+
+middleware = create_logging_middleware(
+    logger_name=config.logger_name,
+    skip_paths=config.skip_paths,
+    sample_rate=config.sample_rate,
+)
 
 TERMINAL_STATES = {"completed", "failed", "canceled", "rejected"}
 
@@ -104,7 +143,7 @@ async def delete_conversation(request: Request, context_id: str):
     """Delete a conversation and its tasks."""
     deleted = await ConversationService.delete(context_id)
     if not deleted:
-        return JSON({"error": "Conversation not found"}, status_code=404)
+        raise NotFound(detail=f"Conversation {context_id} not found")
     return {"success": True}
 
 
@@ -113,7 +152,7 @@ async def get_conversation(request: Request, context_id: str):
     """Get a conversation by ID with history and stream indicator."""
     result = await ConversationService.get_detail(context_id)
     if not result:
-        return JSON({"error": "Conversation not found"}, status_code=404)
+        raise NotFound(detail=f"Conversation {context_id} not found")
     return result
 
 
